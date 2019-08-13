@@ -66,9 +66,10 @@ public class UserInterfaceAgent extends Agent{
 						try {
 							if (message != null) {
 								if(message.getPerformative()==ACLMessage.INFORM) {
-									System.out.println("Recibí el mensaje antes del content");
 									ContentElement ce = getContentManager().extractContent(message);
-									System.out.println("Y el mensaje es el sigte: ");
+									NotificarEjecucion not = (NotificarEjecucion)ce;
+									System.out.println("Y el mensaje es el sigte: "+ not.getEstado());
+									
 								}
 							}
 						}

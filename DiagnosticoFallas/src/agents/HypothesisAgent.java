@@ -1,10 +1,16 @@
 package agents;
 
+import jade.core.AID;
 import jade.core.Agent;
 import jade.core.behaviours.*;
 import jade.lang.acl.ACLMessage;
 import jade.lang.acl.MessageTemplate;
 import jade.content.lang.sl.SLCodec;
+
+import java.util.Vector;
+import java.util.logging.Level;
+import java.util.logging.Logger;
+
 import failures.*;
 import jade.content.ContentElement;
 import jade.content.lang.Codec;
@@ -20,6 +26,8 @@ import jade.domain.FIPAException;
 public class HypothesisAgent extends Agent{
 	private Codec codec = new SLCodec();
 	private Ontology ontology = FailureOntology.getInstance();
+	private Vector <AID> ejecutores = new Vector<AID>();
+	private AID sender;
 	public void setup() {
 		getContentManager().registerLanguage(codec);
 		getContentManager().registerOntology(ontology);
@@ -48,14 +56,49 @@ public class HypothesisAgent extends Agent{
 					if(message.getPerformative()==ACLMessage.REQUEST) {
 						ContentElement ce = getContentManager().extractContent(message);
 							if (ce instanceof SolicitarPrueba) {
-							System.out.println("Recibí el mensaje y la descripción es:");
-							SolicitarPrueba req=(SolicitarPrueba)ce; 
-							System.out.println(req.getFalla().getDescripcion());
+								sender=message.getSender();
+								SolicitarPrueba req=(SolicitarPrueba)ce; 
+								System.out.println(req.getFalla().getDescripcion());
+								DFAgentDescription dfd = new DFAgentDescription();
+								ServiceDescription serviceToFind = new ServiceDescription();
+								serviceToFind.setType("executioner");
+								dfd.addServices(serviceToFind);
+								System.out.println("----------------------------------------");
+								System.out.println("----------------------------------------");
+								try {
+									DFAgentDescription [] result = DFService.search(myAgent, dfd);
+									ejecutores.clear();
+									for(int i=0;i<result.length;i++) {
+										ejecutores.addElement(result[i].getName());
+									}
+								}
+								catch(FIPAException fe) {
+									fe.printStackTrace();
+								}
+								SolicitarEjecucion es = new SolicitarEjecucion();
+								es.setCodigoAEjecutar("1");
+								ACLMessage ExMessage = new ACLMessage(ACLMessage.REQUEST);
+								ExMessage.addReceiver(ejecutores.firstElement());
+								ExMessage.setLanguage(codec.getName());
+								ExMessage.setOntology(ontology.getName());
+								getContentManager().fillContent(ExMessage,es);
+								send(ExMessage);
+								System.out.println(sender);
+							}
+					}
+					else if(message.getPerformative()==ACLMessage.INFORM){
+						ContentElement ce = getContentManager().extractContent(message);
+						if (ce instanceof NotificarEjecucion) {
+							NotificarEjecucion not=(NotificarEjecucion)ce;
+							ACLMessage ExMessage = new ACLMessage(ACLMessage.INFORM);
+							ExMessage.addReceiver(sender);
+							ExMessage.setLanguage(codec.getName());
+							ExMessage.setOntology(ontology.getName());
+							getContentManager().fillContent(ExMessage,not);
+							send(ExMessage);
+							sender=null;
 						}
 					}
-				}
-				else {
-					block();
 				}
 			}
 			catch(OntologyException on) {
@@ -64,16 +107,17 @@ public class HypothesisAgent extends Agent{
 			catch(jade.content.lang.Codec.CodecException ce) {
 				System.out.println(ce);
 			}
-			
 		}
 	}
 	protected void TakeDown() {
 		try {
+			System.out.println("Me morí");
 			DFService.deregister(this);
 		}
 		catch(FIPAException fp){
 			System.out.println(fp);
 		}
 	}
+
 	
 }
